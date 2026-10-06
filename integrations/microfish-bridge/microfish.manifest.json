@@ -1,0 +1,9 @@
+{
+  "id": "microfish",
+  "name": "MicroFish Search/Fetch Gateway",
+  "version": "1.x",
+  "kind": "connector",
+  "description": "Optional open-source MCP search/fetch lane for low-cost web discovery and fetching.",
+  "permissions": ["network"],
+  "enabledByDefault": false
+}
