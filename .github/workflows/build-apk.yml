@@ -1,55 +1,57 @@
-name: Build APK
+name: Loomdesign Android APK
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - feat/loomdesign-android-release
+    tags:
+      - "v*"
   workflow_dispatch:
 
-env:
-  APP_DIR: apps/web   # folder containing the web app's package.json
-  WEB_DIR: dist       # its build output folder
+permissions:
+  contents: write
 
 jobs:
-  apk:
+  build-apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - uses: actions/setup-java@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
 
-      - name: Install and build web app
-        run: |
-          pnpm install
-          pnpm --dir $APP_DIR run build
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Add Capacitor and Android
-        working-directory: ${{ env.APP_DIR }}
-        run: |
-          pnpm add @capacitor/core @capacitor/android
-          pnpm add -D @capacitor/cli
-          [ -f capacitor.config.json ] || [ -f capacitor.config.ts ] || \
-            npx cap init "Code Design" com.lightalter.codedesign --web-dir=$WEB_DIR
-          [ -d android ] || npx cap add android
-          npx cap sync android
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
 
       - name: Build debug APK
-        working-directory: ${{ env.APP_DIR }}/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug
+        run: gradle -p apps/android-native assembleDebug
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: ${{ env.APP_DIR }}/android/app/build/outputs/apk/debug/app-debug.apk
+          name: loomdesign-debug-apk
+          path: apps/android-native/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Build release APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: gradle -p apps/android-native assembleRelease
+
+      - name: Publish tagged APK release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: apps/android-native/app/build/outputs/apk/release/app-release.apk
